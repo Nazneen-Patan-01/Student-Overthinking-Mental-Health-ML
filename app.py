@@ -61,31 +61,56 @@ def calculate_level(row):
         "High Overthinking"
     ][count]
 
+
+# Clean and prepare the dataset
+df[age_col] = pd.to_numeric(df[age_col], errors="coerce")
+
+categorical_cols = [
+    gender_col, course_col, year_col, cgpa_col
+]
+
+for col in categorical_cols + [
+    depression_col, anxiety_col, panic_col
+]:
+    df[col] = df[col].astype("string").str.strip()
+
 df = df.dropna(subset=required).copy()
+
+# Create the target category
 df["Overthinking_Level"] = df.apply(calculate_level, axis=1)
 
+# Separate input features and target
 feature_cols = [gender_col, age_col, course_col, year_col, cgpa_col]
 X = df[feature_cols].copy()
 y = df["Overthinking_Level"]
 
+# Convert all categorical input columns to numeric codes
 encoders = {}
-for col in feature_cols:
-    if X[col].dtype == "object":
-        encoder = LabelEncoder()
-        X[col] = encoder.fit_transform(X[col].astype(str))
-        encoders[col] = encoder
 
+for col in categorical_cols:
+    X[col] = X[col].astype(str)
+    encoder = LabelEncoder()
+    X[col] = encoder.fit_transform(X[col])
+    encoders[col] = encoder
+
+# Encode target categories
 target_encoder = LabelEncoder()
 y_encoded = target_encoder.fit_transform(y)
 
-if y.nunique() < 2 or y.value_counts().min() < 2:
-    st.error("There are not enough records in each category to train this demo.")
+# Split data into training and testing sets
+if y.value_counts().min() < 2:
+    st.error("Not enough records in each category to train the demo.")
     st.stop()
 
 X_train, X_test, y_train, y_test = train_test_split(
-    X, y_encoded, test_size=0.2, random_state=42, stratify=y_encoded
+    X,
+    y_encoded,
+    test_size=0.2,
+    random_state=42,
+    stratify=y_encoded
 )
 
+# Train Random Forest
 model = RandomForestClassifier(
     n_estimators=100,
     max_depth=8,
@@ -93,7 +118,9 @@ model = RandomForestClassifier(
     min_samples_leaf=2,
     random_state=42
 )
+
 model.fit(X_train, y_train)
+
 
 test_accuracy = accuracy_score(y_test, model.predict(X_test))
 
